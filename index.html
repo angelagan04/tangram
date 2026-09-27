@@ -1,0 +1,1637 @@
+<!DOCTYPE html>
+<html lang="en">
+  <head>
+    <title>Home</title>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width" />
+    <!--
+      Need a visual blank slate?
+      Remove all code in `styles.css`!
+    -->
+    <link rel="stylesheet" href="styles.css" />
+    <script type="module" src="script.js"></script>
+  </head>
+  <body>
+    <nav>
+      <a href="/" aria-current="page">Home</a>
+      <a href="/page2.html">Other page</a>
+    </nav>
+    <main>
+      <h1>Home page</h1>
+    </main>
+  </body>
+</html>
+<!DOCTYPE html>
+<html lang="en" class="h-full bg-slate-50">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>RectaGram - Tangram Geometry & Area Explorer</title>
+    <!-- Tailwind CSS CDN for modern responsive UI styling -->
+    <script src="https://cdn.tailwindcss.com"></script>
+    <script>
+        tailwind.config = {
+            theme: {
+                extend: {
+                    colors: {
+                        brand: {
+                            50: '#f0f9ff',
+                            100: '#e0f2fe',
+                            400: '#38bdf8',
+                            50: '#0284c7',
+                            600: '#0369a1',
+                            700: '#075985',
+                        },
+                        math: {
+                            area: '#8b5cf6',
+                            perim: '#ec4899',
+                            correct: '#10b981',
+                            accent: '#f59e0b'
+                        }
+                    },
+                    fontFamily: {
+                        sans: ['Inter', 'system-ui', 'sans-serif'],
+                    }
+                }
+            }
+        }
+    </script>
+    <!-- Custom CSS for Grid canvas, Animations and interaction cues -->
+    <style>
+        .workspace-grid {
+            background-size: 32px 32px;
+            background-image: 
+                linear-gradient(to right, rgba(203, 213, 225, 0.4) 1px, transparent 1px),
+                linear-gradient(to bottom, rgba(203, 213, 225, 0.4) 1px, transparent 1px);
+            background-position: -1px -1px;
+        }
+
+        .target-slot {
+            transition: all 0.2s ease;
+            box-shadow: inset 0 0 8px rgba(0, 0, 0, 0.06);
+        }
+
+        .piece-element {
+            touch-action: none;
+            user-select: none;
+            transition: transform 0.15s cubic-bezier(0.2, 0.8, 0.2, 1), box-shadow 0.15s ease;
+            cursor: pointer;
+        }
+
+        .piece-element:active, .piece-element.is-dragging {
+            cursor: grabbing;
+            z-index: 50 !important;
+            box-shadow: 0 14px 28px rgba(0,0,0,0.25), 0 10px 10px rgba(0,0,0,0.22);
+            transform: scale(1.02);
+        }
+
+        .piece-selected {
+            outline: 3px solid #3b82f6;
+            outline-offset: 3px;
+        }
+
+        @keyframes snapPulse {
+            0% { transform: scale(1); }
+            50% { transform: scale(1.06); }
+            100% { transform: scale(1); }
+        }
+
+        .animate-snap {
+            animation: snapPulse 0.25s ease-out;
+        }
+
+        @keyframes hintGlow {
+            0%, 100% { outline: 3px dashed #f59e0b; box-shadow: 0 0 15px rgba(245, 158, 11, 0.6); }
+            50% { outline: 3px dashed #ef4444; box-shadow: 0 0 25px rgba(239, 68, 68, 0.8); }
+        }
+
+        .hint-active {
+            animation: hintGlow 1.2s infinite ease-in-out;
+            z-index: 30;
+        }
+
+        /* Custom scrollbars */
+        ::-webkit-scrollbar {
+            width: 6px;
+            height: 6px;
+        }
+        ::-webkit-scrollbar-track {
+            background: #f1f5f9;
+        }
+        ::-webkit-scrollbar-thumb {
+            background: #cbd5e1;
+            border-radius: 4px;
+        }
+    </style>
+</head>
+<body class="h-full flex flex-col font-sans text-slate-800 antialiased select-none">
+
+    <!-- Top Navigation Header -->
+    <header class="bg-white border-b border-slate-200 sticky top-0 z-40 shadow-sm">
+        <div class="max-w-7xl mx-auto px-4 py-3 flex flex-wrap items-center justify-between gap-3">
+            <div class="flex items-center space-x-3">
+                <div class="w-10 h-10 rounded-xl bg-gradient-to-tr from-brand-600 to-brand-400 flex items-center justify-center text-white font-black text-xl shadow-md">
+                    📐
+                </div>
+                <div>
+                    <h1 class="font-extrabold text-xl leading-tight text-slate-900 tracking-tight">RectaGram</h1>
+                    <p class="text-xs text-slate-500 font-medium">Rectangle & Square Geometry Tangram</p>
+                </div>
+            </div>
+
+            <!-- Puzzle Controls & Difficulty Selectors -->
+            <div class="flex flex-wrap items-center gap-2">
+                <!-- Difficulty Tabs -->
+                <div class="bg-slate-100 p-1 rounded-xl flex space-x-1 border border-slate-200 text-xs font-semibold">
+                    <button id="btn-diff-1" onclick="setDifficulty(1)" class="px-3 py-1.5 rounded-lg transition-all bg-white text-brand-600 shadow-sm">Easy (4-5)</button>
+                    <button id="btn-diff-2" onclick="setDifficulty(2)" class="px-3 py-1.5 rounded-lg transition-all text-slate-600 hover:text-slate-900">Medium (6-8)</button>
+                    <button id="btn-diff-3" onclick="setDifficulty(3)" class="px-3 py-1.5 rounded-lg transition-all text-slate-600 hover:text-slate-900">Hard (9-10)</button>
+                </div>
+
+                <!-- Puzzle Dropdown -->
+                <select id="puzzle-select" onchange="loadSelectedPuzzle()" class="bg-white border border-slate-300 text-slate-800 text-sm font-semibold rounded-xl px-3 py-1.5 focus:ring-2 focus:ring-brand-500 outline-none cursor-pointer shadow-sm">
+                    <!-- Populated by JS -->
+                </select>
+
+                <!-- Teacher Guide Modal Button -->
+                <button onclick="toggleTeacherGuide(true)" class="bg-amber-50 hover:bg-amber-100 text-amber-700 border border-amber-200 font-bold px-3 py-1.5 rounded-xl text-xs flex items-center space-x-1.5 transition-colors">
+                    <span>🍎</span>
+                    <span>Teacher Guide</span>
+                </button>
+            </div>
+        </div>
+    </header>
+
+    <!-- Main Content Grid -->
+    <main class="flex-1 max-w-7xl w-full mx-auto p-4 grid grid-cols-1 lg:grid-cols-12 gap-5 overflow-y-auto">
+        
+        <!-- LEFT COLUMN: Piece Palette / Tray (lg:col-span-4) -->
+        <section class="lg:col-span-4 flex flex-col bg-white rounded-2xl border border-slate-200 p-4 shadow-sm flex-1 min-h-[360px]">
+            <div class="flex items-center justify-between pb-3 border-b border-slate-100 mb-3">
+                <div class="flex items-center space-x-2">
+                    <span class="text-lg">📦</span>
+                    <h2 class="font-bold text-slate-800 text-sm uppercase tracking-wider">Shape Tray</h2>
+                </div>
+                <span id="tray-count" class="bg-brand-50 text-brand-700 text-xs font-bold px-2.5 py-1 rounded-full border border-brand-200">
+                    0 / 0 Remaining
+                </span>
+            </div>
+
+            <p class="text-xs text-slate-500 mb-3">
+                Click any shape to select, then click on the grid to place or move it elsewhere!
+            </p>
+
+            <!-- Scrollable Shape Tray Container -->
+            <div id="piece-tray" class="flex-1 flex flex-wrap gap-3 overflow-y-auto pr-1 items-center justify-center lg:justify-start min-h-[250px] p-1">
+                <!-- Piece cards dynamically rendered here -->
+            </div>
+
+            <!-- Global Action Controls -->
+            <div class="pt-3 border-t border-slate-100 grid grid-cols-2 gap-2 mt-3">
+                <button onclick="resetPuzzle()" class="bg-slate-100 hover:bg-slate-200 text-slate-700 font-bold py-2 px-3 rounded-xl text-xs flex items-center justify-center space-x-1 transition-colors">
+                    <span>🔄</span>
+                    <span>Reset</span>
+                </button>
+                <button onclick="giveHint()" class="bg-amber-400 hover:bg-amber-500 text-amber-950 font-bold py-2 px-3 rounded-xl text-xs flex items-center justify-center space-x-1 transition-colors shadow-sm">
+                    <span>💡</span>
+                    <span>Hint</span>
+                </button>
+            </div>
+        </section>
+
+        <!-- CENTER COLUMN: Workspace / Grid Canvas (lg:col-span-8) -->
+        <section class="lg:col-span-8 flex flex-col bg-white rounded-2xl border border-slate-200 p-4 shadow-sm relative overflow-hidden">
+            <!-- Canvas Header Details -->
+            <div class="flex items-center justify-between pb-3 mb-2 border-b border-slate-100">
+                <div>
+                    <span id="puzzle-category-badge" class="text-[10px] font-extrabold uppercase tracking-widest bg-emerald-100 text-emerald-800 px-2 py-0.5 rounded-md">
+                        Easy Level
+                    </span>
+                    <h2 id="puzzle-title" class="text-lg font-black text-slate-800 tracking-tight mt-0.5">
+                        House
+                    </h2>
+                </div>
+
+                <!-- Active Tools Quick Bar -->
+                <div class="flex items-center space-x-2">
+                    <button id="btn-rotate-sel" onclick="rotateSelectedPiece()" disabled class="disabled:opacity-40 disabled:cursor-not-allowed bg-brand-50 hover:bg-brand-100 text-brand-700 font-bold px-3 py-1.5 rounded-xl text-xs flex items-center space-x-1 border border-brand-200 transition-all">
+                        <span>↻</span>
+                        <span>Rotate (R)</span>
+                    </button>
+                    <button onclick="checkPuzzleSolution()" class="bg-emerald-500 hover:bg-emerald-600 text-white font-black px-4 py-1.5 rounded-xl text-xs shadow-md hover:shadow-lg transition-all flex items-center space-x-1">
+                        <span>✅</span>
+                        <span>Check Answer</span>
+                    </button>
+                </div>
+            </div>
+
+            <!-- Main Interactive Canvas Container -->
+            <div class="flex-1 flex items-center justify-center relative overflow-auto p-2 bg-slate-50/70 rounded-xl border border-slate-200">
+                <div id="canvas-wrapper" class="relative workspace-grid rounded-lg border-2 border-slate-300 shadow-inner overflow-hidden bg-white cursor-pointer">
+                    <!-- Target Silhouette slots rendered in background -->
+                    <div id="target-layer" class="absolute inset-0 pointer-events-none"></div>
+                    
+                    <!-- Placed interactive shape pieces rendered here -->
+                    <div id="pieces-layer" class="absolute inset-0"></div>
+
+                    <!-- Drop/Move position preview shadow for click-to-place & drag -->
+                    <div id="drop-preview" class="hidden absolute border-2 border-dashed border-brand-500 bg-brand-400/30 pointer-events-none rounded transition-all z-20"></div>
+
+                    <!-- Keyboard navigation cursor highlight -->
+                    <div id="key-cursor" class="hidden absolute border-2 border-brand-500 bg-brand-400/20 pointer-events-none rounded transition-all"></div>
+                </div>
+
+                <!-- Touch Directional Movement Controls (Bottom-Right Corner) -->
+                <div class="absolute bottom-4 right-4 z-30 bg-white/95 backdrop-blur-md border border-slate-200 shadow-xl rounded-2xl p-2 flex flex-col items-center select-none">
+                    <span class="text-[9px] font-extrabold uppercase text-slate-400 tracking-wider mb-1">Maneuver</span>
+                    <div class="grid grid-cols-3 gap-1 w-28 h-28">
+                        <div></div>
+                        <button onclick="moveSelectedPiece(0, -1)" class="bg-slate-100 hover:bg-brand-500 active:bg-brand-600 hover:text-white text-slate-700 font-black rounded-xl text-sm flex items-center justify-center shadow-sm transition-all active:scale-95 border border-slate-200/80" title="Move Up">▲</button>
+                        <div></div>
+                        <button onclick="moveSelectedPiece(-1, 0)" class="bg-slate-100 hover:bg-brand-500 active:bg-brand-600 hover:text-white text-slate-700 font-black rounded-xl text-sm flex items-center justify-center shadow-sm transition-all active:scale-95 border border-slate-200/80" title="Move Left">◄</button>
+                        <button onclick="rotateSelectedPiece()" class="bg-brand-50 hover:bg-brand-500 active:bg-brand-600 text-brand-700 hover:text-white font-black rounded-xl text-xs flex items-center justify-center shadow-sm transition-all active:scale-95 border border-brand-200" title="Rotate Shape">↻</button>
+                        <button onclick="moveSelectedPiece(1, 0)" class="bg-slate-100 hover:bg-brand-500 active:bg-brand-600 hover:text-white text-slate-700 font-black rounded-xl text-sm flex items-center justify-center shadow-sm transition-all active:scale-95 border border-slate-200/80" title="Move Right">►</button>
+                        <div></div>
+                        <button onclick="moveSelectedPiece(0, 1)" class="bg-slate-100 hover:bg-brand-500 active:bg-brand-600 hover:text-white text-slate-700 font-black rounded-xl text-sm flex items-center justify-center shadow-sm transition-all active:scale-95 border border-slate-200/80" title="Move Down">▼</button>
+                        <div></div>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Canvas Bottom Toolbar & Keyboard Shortcuts -->
+            <div class="mt-3 pt-2 border-t border-slate-100 flex items-center justify-between text-xs text-slate-500">
+                <div class="flex items-center space-x-3">
+                    <span class="flex items-center"><kbd class="bg-slate-100 border border-slate-300 rounded px-1 text-[10px] font-mono mr-1">Click</kbd> Move Shape</span>
+                    <span class="flex items-center"><kbd class="bg-slate-100 border border-slate-300 rounded px-1 text-[10px] font-mono mr-1">R</kbd> Rotate</span>
+                    <span class="flex items-center"><kbd class="bg-slate-100 border border-slate-300 rounded px-1 text-[10px] font-mono mr-1">Arrows</kbd> Shift</span>
+                </div>
+                <div class="font-medium text-slate-600 flex items-center space-x-1">
+                    <span>Grid Scale:</span>
+                    <span class="font-bold text-slate-800">1 Grid Cell = 1 cm</span>
+                </div>
+            </div>
+        </section>
+
+    </main>
+
+    <!-- Celebration Modal -->
+    <div id="celebration-modal" class="hidden fixed inset-0 z-50 flex items-center justify-center p-4 bg-slate-900/60 backdrop-blur-sm">
+        <div class="bg-white rounded-3xl p-6 max-w-md w-full shadow-2xl border border-slate-100 text-center relative overflow-hidden transform transition-all scale-95 animate-snap">
+            <div class="text-6xl mb-3">🎉</div>
+            <h2 class="text-2xl font-black text-slate-900 mb-1">Awesome Job!</h2>
+            <p id="celebration-subtitle" class="text-sm text-slate-600 mb-4">
+                You successfully built the composite figure!
+            </p>
+
+            <div class="bg-amber-50 rounded-2xl p-4 border border-amber-200 mb-5 text-left text-xs space-y-2">
+                <div class="flex justify-between items-center font-bold text-amber-900">
+                    <span>⭐ Stars Earned:</span>
+                    <span id="stars-earned" class="text-base">⭐⭐⭐</span>
+                </div>
+                <div class="flex justify-between items-center text-slate-700">
+                    <span>📐 Total Composite Area:</span>
+                    <span id="final-total-area" class="font-bold">64 cm²</span>
+                </div>
+                <div class="flex justify-between items-center text-slate-700">
+                    <span>💡 Hints Used:</span>
+                    <span id="final-hints-count" class="font-bold">0</span>
+                </div>
+            </div>
+
+            <div class="flex space-x-3">
+                <button onclick="closeCelebrationModal()" class="flex-1 bg-slate-100 hover:bg-slate-200 text-slate-700 font-bold py-2.5 px-4 rounded-xl text-xs transition-colors">
+                    Review Figure
+                </button>
+                <button onclick="loadNextPuzzle()" class="flex-1 bg-emerald-500 hover:bg-emerald-600 text-white font-black py-2.5 px-4 rounded-xl text-xs shadow-md transition-all">
+                    Next Puzzle ➡️
+                </button>
+            </div>
+        </div>
+    </div>
+
+    <!-- Teacher & Parent Pedagogical Guide Modal -->
+    <div id="teacher-modal" class="hidden fixed inset-0 z-50 flex items-center justify-center p-4 bg-slate-900/50 backdrop-blur-sm">
+        <div class="bg-white rounded-3xl p-6 max-w-2xl w-full shadow-2xl border border-slate-100 relative max-h-[90vh] flex flex-col">
+            <div class="flex items-center justify-between pb-3 border-b border-slate-100 mb-4">
+                <div class="flex items-center space-x-2">
+                    <span class="text-2xl">🍎</span>
+                    <div>
+                        <h2 class="text-lg font-black text-slate-900">Teacher & Parent Pedagogical Guide</h2>
+                        <p class="text-xs text-slate-500">Geometry Curriculum Connections (Primary 3 - Primary 5)</p>
+                    </div>
+                </div>
+                <button onclick="toggleTeacherGuide(false)" class="text-slate-400 hover:text-slate-600 font-bold text-xl px-2">✕</button>
+            </div>
+
+            <div class="flex-1 overflow-y-auto space-y-4 text-xs text-slate-700 pr-2">
+                <div class="bg-brand-50 p-3 rounded-xl border border-brand-200">
+                    <h3 class="font-bold text-brand-900 text-sm mb-1">🎯 Core Educational Objectives</h3>
+                    <ul class="list-disc list-inside space-y-1 text-slate-700">
+                        <li><strong>Composite Figure Decomposition:</strong> Understand how complex 2D shapes are formed by partitioning or combining basic rectangles and squares.</li>
+                        <li><strong>Area Calculation:</strong> Master the formula $\text{Area} = \text{Length} \times \text{Breadth}$ ($L \times B$) in square units ($\text{cm}^2$).</li>
+                        <li><strong>Perimeter vs. Area:</strong> Differentiate between boundary distance ($\text{Perimeter} = 2L + 2B$) and surface coverage ($\text{Area}$).</li>
+                        <li><strong>Spatial Transformation:</strong> Develop mental visualization through 90-degree rotations and grid alignment.</li>
+                    </ul>
+                </div>
+
+                <div>
+                    <h3 class="font-bold text-slate-900 text-sm mb-1">💡 Classroom Activity Suggestions</h3>
+                    <ol class="list-decimal list-inside space-y-1.5">
+                        <li><strong>Predict Before You Place:</strong> Before dragging or clicking a piece, ask students to calculate its area ($L \times B$) and match it mentally with the target grid cells.</li>
+                        <li><strong>Decomposition Challenge:</strong> Ask students: <em>"In how many different ways can this robot silhouette be sliced into rectangles?"</em></li>
+                        <li><strong>Same Area, Different Perimeter:</strong> Have students select two shapes with an area of $12\text{ cm}^2$ (e.g., $3 \times 4$ vs. $2 \times 6$) and calculate their perimeters ($14\text{ cm}$ vs. $16\text{ cm}$).</li>
+                    </ol>
+                </div>
+
+                <div class="bg-slate-50 p-3 rounded-xl border border-slate-200">
+                    <h3 class="font-bold text-slate-900 mb-1">🔒 Constraint Guarantee</h3>
+                    <p>
+                        This digital tangram strictly utilizes <strong>ONLY 4-sided right-angled polygons (rectangles and squares)</strong>. No triangles or diagonal cuts are used, reinforcing right-angle grid geometry aligned with standard elementary primary math syllabi.
+                    </p>
+                </div>
+            </div>
+
+            <div class="pt-4 border-t border-slate-100 flex justify-end">
+                <button onclick="toggleTeacherGuide(false)" class="bg-brand-600 hover:bg-brand-700 text-white font-bold px-5 py-2 rounded-xl text-xs transition-colors">
+                    Got it, let's explore!
+                </button>
+            </div>
+        </div>
+    </div>
+
+    <script>
+        /**
+         * PUZZLE DATA LIBRARY
+         * Strictly composed of non-overlapping rectangular & square partitions.
+         */
+        const GRID_CELL_SIZE = 32; // pixels per cm grid unit
+
+        const PUZZLES = [
+            // EASY LEVEL (4-5 shapes)
+            {
+                id: 'house',
+                name: 'Cozy House',
+                category: 'Easy',
+                difficulty: 1,
+                icon: '🏠',
+                gridCols: 16,
+                gridRows: 14,
+                slots: [
+                    { id: 's1', x: 7, y: 3, w: 2, h: 2, label: 'Roof Peak' },
+                    { id: 's2', x: 5, y: 5, w: 6, h: 2, label: 'Roof Base' },
+                    { id: 's3', x: 4, y: 7, w: 8, h: 4, label: 'Main House' },
+                    { id: 's4', x: 6, y: 11, w: 4, h: 2, label: 'Front Porch' }
+                ],
+                questions: [
+                    {
+                        text: 'What is the total area of the Cozy House composite figure?',
+                        options: ['56 cm²', '48 cm²', '64 cm²', '52 cm²'],
+                        correct: 0, // 4 + 12 + 32 + 8 = 56 cm²
+                        explanation: 'Area = Roof Peak (4) + Roof Base (12) + Main House (32) + Porch (8) = 56 cm².'
+                    },
+                    {
+                        text: 'Which shape component has the largest area?',
+                        options: ['Main House', 'Roof Base', 'Front Porch', 'Roof Peak'],
+                        correct: 0,
+                        explanation: 'Main House area is 8 × 4 = 32 cm², which is the largest shape piece.'
+                    },
+                    {
+                        text: 'What is the perimeter of the Front Porch rectangle (4×2 cm)?',
+                        options: ['12 cm', '8 cm', '14 cm', '16 cm'],
+                        correct: 0,
+                        explanation: 'Perimeter = 2 × (Length + Breadth) = 2 × (4 + 2) = 12 cm.'
+                    }
+                ]
+            },
+            {
+                id: 'rocket',
+                name: 'Space Rocket',
+                category: 'Easy',
+                difficulty: 1,
+                icon: '🚀',
+                gridCols: 16,
+                gridRows: 14,
+                slots: [
+                    { id: 's1', x: 7, y: 1, w: 2, h: 2, label: 'Nose Tip' },
+                    { id: 's2', x: 6, y: 3, w: 4, h: 3, label: 'Upper Stage' },
+                    { id: 's3', x: 5, y: 6, w: 6, h: 4, label: 'Main Booster' },
+                    { id: 's4', x: 3, y: 10, w: 2, h: 3, label: 'Left Wing' },
+                    { id: 's5', x: 11, y: 10, w: 2, h: 3, label: 'Right Wing' }
+                ],
+                questions: [
+                    {
+                        text: 'What is the total area of the Space Rocket?',
+                        options: ['52 cm²', '46 cm²', '58 cm²', '40 cm²'],
+                        correct: 0, // 4 + 12 + 24 + 6 + 6 = 52
+                        explanation: 'Area = 4 + 12 + 24 + 6 + 6 = 52 cm².'
+                    },
+                    {
+                        text: 'What is the perimeter of the Main Booster (6×4 cm)?',
+                        options: ['20 cm', '24 cm', '18 cm', '16 cm'],
+                        correct: 0,
+                        explanation: 'Perimeter = 2 × (6 + 4) = 20 cm.'
+                    },
+                    {
+                        text: 'How many Left Wings (2×3 cm, area 6 cm²) equal the Main Booster area (24 cm²)?',
+                        options: ['4 wings', '3 wings', '5 wings', '2 wings'],
+                        correct: 0,
+                        explanation: '24 ÷ 6 = 4 wings.'
+                    }
+                ]
+            },
+            {
+                id: 'tree',
+                name: 'Garden Tree',
+                category: 'Easy',
+                difficulty: 1,
+                icon: '🌲',
+                gridCols: 16,
+                gridRows: 14,
+                slots: [
+                    { id: 's1', x: 6, y: 2, w: 4, h: 2, label: 'Top Leaves' },
+                    { id: 's2', x: 4, y: 4, w: 8, h: 3, label: 'Mid Leaves' },
+                    { id: 's3', x: 2, y: 7, w: 12, h: 3, label: 'Base Leaves' },
+                    { id: 's4', x: 7, y: 10, w: 2, h: 4, label: 'Tree Trunk' }
+                ],
+                questions: [
+                    {
+                        text: 'What is the total area of the Garden Tree?',
+                        options: ['76 cm²', '68 cm²', '80 cm²', '72 cm²'],
+                        correct: 0, // 8 + 24 + 36 + 8 = 76
+                        explanation: 'Area = 8 + 24 + 36 + 8 = 76 cm².'
+                    },
+                    {
+                        text: 'What is the combined area of all 3 foliage leaf layers?',
+                        options: ['68 cm²', '60 cm²', '70 cm²', '64 cm²'],
+                        correct: 0,
+                        explanation: 'Top (8) + Mid (24) + Base (36) = 68 cm².'
+                    },
+                    {
+                        text: 'What is the perimeter of the Tree Trunk (2×4 cm)?',
+                        options: ['12 cm', '8 cm', '16 cm', '10 cm'],
+                        correct: 0,
+                        explanation: 'Perimeter = 2 × (2 + 4) = 12 cm.'
+                    }
+                ]
+            },
+            {
+                id: 'arrow',
+                name: 'Upward Arrow',
+                category: 'Easy',
+                difficulty: 1,
+                icon: '⬆️',
+                gridCols: 16,
+                gridRows: 14,
+                slots: [
+                    { id: 's1', x: 7, y: 1, w: 2, h: 2, label: 'Arrow Tip' },
+                    { id: 's2', x: 5, y: 3, w: 6, h: 2, label: 'Head Mid' },
+                    { id: 's3', x: 3, y: 5, w: 10, h: 2, label: 'Head Base' },
+                    { id: 's4', x: 6, y: 7, w: 4, h: 3, label: 'Shaft Upper' },
+                    { id: 's5', x: 6, y: 10, w: 4, h: 3, label: 'Shaft Lower' }
+                ],
+                questions: [
+                    {
+                        text: 'What is the total area of the Arrow?',
+                        options: ['60 cm²', '54 cm²', '64 cm²', '50 cm²'],
+                        correct: 0, // 4 + 12 + 20 + 12 + 12 = 60
+                        explanation: 'Area = 4 + 12 + 20 + 12 + 12 = 60 cm².'
+                    },
+                    {
+                        text: 'If Shaft Upper (4×3) and Shaft Lower (4×3) are stacked together, what is the combined rectangle size?',
+                        options: ['4×6 cm', '8×3 cm', '4×3 cm', '6×6 cm'],
+                        correct: 0,
+                        explanation: 'Stacking two 4×3 cm rectangles vertically yields a 4×6 cm rectangle.'
+                    },
+                    {
+                        text: 'What is the perimeter of the combined 4×6 cm shaft?',
+                        options: ['20 cm', '24 cm', '18 cm', '16 cm'],
+                        correct: 0,
+                        explanation: 'Perimeter = 2 × (4 + 6) = 20 cm.'
+                    }
+                ]
+            },
+
+            // MEDIUM LEVEL (6-8 shapes)
+            {
+                id: 'robot',
+                name: 'Friendly Robot',
+                category: 'Medium',
+                difficulty: 2,
+                icon: '🤖',
+                gridCols: 16,
+                gridRows: 15,
+                slots: [
+                    { id: 's1', x: 7, y: 1, w: 2, h: 1, label: 'Antenna' },
+                    { id: 's2', x: 5, y: 2, w: 6, h: 3, label: 'Robot Head' },
+                    { id: 's3', x: 7, y: 5, w: 2, h: 1, label: 'Neck' },
+                    { id: 's4', x: 4, y: 6, w: 8, h: 5, label: 'Torso' },
+                    { id: 's5', x: 2, y: 6, w: 2, h: 4, label: 'Left Arm' },
+                    { id: 's6', x: 12, y: 6, w: 2, h: 4, label: 'Right Arm' },
+                    { id: 's7', x: 5, y: 11, w: 6, h: 3, label: 'Wheel Base' }
+                ],
+                questions: [
+                    {
+                        text: 'What is the total area of the Robot?',
+                        options: ['94 cm²', '88 cm²', '100 cm²', '90 cm²'],
+                        correct: 0, // 2 + 18 + 2 + 40 + 8 + 8 + 18 = 94
+                        explanation: 'Area = 2 + 18 + 2 + 40 + 8 + 8 + 18 = 94 cm².'
+                    },
+                    {
+                        text: 'Which shape component has the largest area?',
+                        options: ['Torso', 'Robot Head', 'Wheel Base', 'Right Arm'],
+                        correct: 0,
+                        explanation: 'Torso area = 8 × 5 = 40 cm², which is the largest.'
+                    },
+                    {
+                        text: 'How many Antenna pieces (2×1 cm, area 2 cm²) equal the Torso area (40 cm²)?',
+                        options: ['20', '15', '10', '25'],
+                        correct: 0,
+                        explanation: '40 ÷ 2 = 20 antenna pieces.'
+                    }
+                ]
+            },
+            {
+                id: 'train',
+                name: 'Steam Engine',
+                category: 'Medium',
+                difficulty: 2,
+                icon: '🚂',
+                gridCols: 16,
+                gridRows: 14,
+                slots: [
+                    { id: 's1', x: 2, y: 4, w: 4, h: 6, label: 'Cabin' },
+                    { id: 's2', x: 6, y: 6, w: 7, h: 4, label: 'Boiler' },
+                    { id: 's3', x: 10, y: 3, w: 2, h: 3, label: 'Smokestack' },
+                    { id: 's4', x: 13, y: 8, w: 2, h: 2, label: 'Catcher' },
+                    { id: 's5', x: 3, y: 10, w: 2, h: 2, label: 'Rear Wheel' },
+                    { id: 's6', x: 7, y: 10, w: 2, h: 2, label: 'Mid Wheel' },
+                    { id: 's7', x: 10, y: 10, w: 2, h: 2, label: 'Front Wheel' }
+                ],
+                questions: [
+                    {
+                        text: 'What is the combined area of all 3 Wheels (each 2×2 cm)?',
+                        options: ['12 cm²', '16 cm²', '8 cm²', '24 cm²'],
+                        correct: 0,
+                        explanation: 'Each wheel = 2×2 = 4 cm². Three wheels = 3 × 4 = 12 cm².'
+                    },
+                    {
+                        text: 'What is the total area of the Steam Engine?',
+                        options: ['74 cm²', '68 cm²', '80 cm²', '70 cm²'],
+                        correct: 0, // 24 + 28 + 6 + 4 + 12 = 74
+                        explanation: 'Area = 24 + 28 + 6 + 4 + 12 = 74 cm².'
+                    },
+                    {
+                        text: 'What is the perimeter of the Cabin (4×6 cm)?',
+                        options: ['20 cm', '24 cm', '18 cm', '16 cm'],
+                        correct: 0,
+                        explanation: 'Perimeter = 2 × (4 + 6) = 20 cm.'
+                    }
+                ]
+            },
+            {
+                id: 'letter_e',
+                name: 'Capital Letter E',
+                category: 'Medium',
+                difficulty: 2,
+                icon: '🔤',
+                gridCols: 16,
+                gridRows: 14,
+                slots: [
+                    { id: 's1', x: 3, y: 1, w: 3, h: 12, label: 'Spine' },
+                    { id: 's2', x: 6, y: 1, w: 6, h: 3, label: 'Top Arm' },
+                    { id: 's3', x: 6, y: 6, w: 5, h: 2, label: 'Middle Arm' },
+                    { id: 's4', x: 6, y: 10, w: 6, h: 3, label: 'Bottom Arm' },
+                    { id: 's5', x: 12, y: 1, w: 2, h: 3, label: 'Top Cap' },
+                    { id: 's6', x: 12, y: 10, w: 2, h: 3, label: 'Bottom Cap' }
+                ],
+                questions: [
+                    {
+                        text: 'What is the total area of Letter E?',
+                        options: ['94 cm²', '86 cm²', '90 cm²', '100 cm²'],
+                        correct: 0, // 36 + 18 + 10 + 18 + 6 + 6 = 94
+                        explanation: 'Area = 36 + 18 + 10 + 18 + 6 + 6 = 94 cm².'
+                    },
+                    {
+                        text: 'Compare Top Arm (6×3 cm) and Bottom Arm (6×3 cm). What are their areas?',
+                        options: ['Both are 18 cm²', 'Top is 18 cm², Bottom is 15 cm²', 'Top is 20 cm², Bottom is 18 cm²', 'Both are 24 cm²'],
+                        correct: 0,
+                        explanation: 'Both arms have identical dimensions 6 × 3 = 18 cm².'
+                    },
+                    {
+                        text: 'What is the area of the Spine rectangle (3×12 cm)?',
+                        options: ['36 cm²', '30 cm²', '40 cm²', '28 cm²'],
+                        correct: 0,
+                        explanation: '3 × 12 = 36 cm².'
+                    }
+                ]
+            },
+            {
+                id: 'letter_h',
+                name: 'Block Letter H',
+                category: 'Medium',
+                difficulty: 2,
+                icon: '🏢',
+                gridCols: 16,
+                gridRows: 14,
+                slots: [
+                    { id: 's1', x: 3, y: 2, w: 3, h: 5, label: 'Left Top' },
+                    { id: 's2', x: 3, y: 7, w: 3, h: 5, label: 'Left Bottom' },
+                    { id: 's3', x: 6, y: 5, w: 4, h: 4, label: 'Center Square' },
+                    { id: 's4', x: 10, y: 2, w: 3, h: 5, label: 'Right Top' },
+                    { id: 's5', x: 10, y: 7, w: 3, h: 5, label: 'Right Bottom' },
+                    { id: 's6', x: 6, y: 2, w: 4, h: 2, label: 'Top Arch' }
+                ],
+                questions: [
+                    {
+                        text: 'What is the total area of Letter H?',
+                        options: ['84 cm²', '78 cm²', '90 cm²', '80 cm²'],
+                        correct: 0, // 15 + 15 + 16 + 15 + 15 + 8 = 84
+                        explanation: 'Area = 15 + 15 + 16 + 15 + 15 + 8 = 84 cm².'
+                    },
+                    {
+                        text: 'If Left Top (3×5) and Left Bottom (3×5) are stacked vertically, what rectangle do they form?',
+                        options: ['3×10 cm', '6×5 cm', '3×5 cm', '6×10 cm'],
+                        correct: 0,
+                        explanation: 'Stacking two 3×5 rectangles vertically forms a 3×10 cm rectangle.'
+                    },
+                    {
+                        text: 'What is the perimeter of the Center Square (4×4 cm)?',
+                        options: ['16 cm', '20 cm', '12 cm', '8 cm'],
+                        correct: 0,
+                        explanation: 'Perimeter = 4 × 4 = 16 cm.'
+                    }
+                ]
+            },
+
+            // HARD LEVEL (9-10 shapes)
+            {
+                id: 'castle',
+                name: 'Royal Fortress',
+                category: 'Hard',
+                difficulty: 3,
+                icon: '🏰',
+                gridCols: 16,
+                gridRows: 15,
+                slots: [
+                    { id: 's1', x: 1, y: 5, w: 3, h: 8, label: 'West Tower' },
+                    { id: 's2', x: 12, y: 5, w: 3, h: 8, label: 'East Tower' },
+                    { id: 's3', x: 4, y: 8, w: 8, h: 5, label: 'Main Keep' },
+                    { id: 's4', x: 6, y: 3, w: 4, h: 5, label: 'High Spire' },
+                    { id: 's5', x: 1, y: 3, w: 1, h: 2, label: 'Battlement A' },
+                    { id: 's6', x: 3, y: 3, w: 1, h: 2, label: 'Battlement B' },
+                    { id: 's7', x: 12, y: 3, w: 1, h: 2, label: 'Battlement C' },
+                    { id: 's8', x: 14, y: 3, w: 1, h: 2, label: 'Battlement D' },
+                    { id: 's9', x: 7, y: 10, w: 2, h: 3, label: 'Gatehouse' },
+                    { id: 's10', x: 7, y: 1, w: 2, h: 2, label: 'Flag Crest' }
+                ],
+                questions: [
+                    {
+                        text: 'What is the total area of the Royal Fortress?',
+                        options: ['126 cm²', '118 cm²', '130 cm²', '120 cm²'],
+                        correct: 0, // 24 + 24 + 40 + 20 + 2+2+2+2 + 6 + 4 = 126
+                        explanation: 'Area = 24 + 24 + 40 + 20 + 8 + 6 + 4 = 126 cm².'
+                    },
+                    {
+                        text: 'What is the area of the Main Keep (8×5 cm)?',
+                        options: ['40 cm²', '35 cm²', '45 cm²', '30 cm²'],
+                        correct: 0,
+                        explanation: '8 × 5 = 40 cm².'
+                    },
+                    {
+                        text: 'How many Battlement shapes (1×2 cm, area 2 cm²) equal the High Spire area (20 cm²)?',
+                        options: ['10 battlements', '8 battlements', '12 battlements', '5 battlements'],
+                        correct: 0,
+                        explanation: '20 ÷ 2 = 10 battlement shapes.'
+                    }
+                ]
+            },
+            {
+                id: 'bridge',
+                name: 'Suspension Bridge',
+                category: 'Hard',
+                difficulty: 3,
+                icon: '🌉',
+                gridCols: 16,
+                gridRows: 14,
+                slots: [
+                    { id: 's1', x: 1, y: 4, w: 3, h: 7, label: 'West Pillar' },
+                    { id: 's2', x: 12, y: 4, w: 3, h: 7, label: 'East Pillar' },
+                    { id: 's3', x: 1, y: 11, w: 4, h: 2, label: 'West Base' },
+                    { id: 's4', x: 11, y: 11, w: 4, h: 2, label: 'East Base' },
+                    { id: 's5', x: 4, y: 7, w: 4, h: 2, label: 'Deck Left' },
+                    { id: 's6', x: 8, y: 7, w: 4, h: 2, label: 'Deck Right' },
+                    { id: 's7', x: 6, y: 5, w: 4, h: 2, label: 'Center Cable' },
+                    { id: 's8', x: 7, y: 3, w: 2, h: 2, label: 'Keystone' },
+                    { id: 's9', x: 2, y: 2, w: 1, h: 2, label: 'West Tip' },
+                    { id: 's10', x: 13, y: 2, w: 1, h: 2, label: 'East Tip' }
+                ],
+                questions: [
+                    {
+                        text: 'What is the total area of the Suspension Bridge?',
+                        options: ['90 cm²', '84 cm²', '96 cm²', '80 cm²'],
+                        correct: 0, // 21 + 21 + 8 + 8 + 8 + 8 + 8 + 4 + 2 + 2 = 90
+                        explanation: 'Area = 21 + 21 + 8 + 8 + 8 + 8 + 8 + 4 + 2 + 2 = 90 cm².'
+                    },
+                    {
+                        text: 'If Deck Left (4×2) and Deck Right (4×2) are joined horizontally, what is the combined deck length?',
+                        options: ['8 cm', '6 cm', '10 cm', '4 cm'],
+                        correct: 0,
+                        explanation: 'Two 4 cm wide deck segments joined side by side make 4 + 4 = 8 cm length.'
+                    },
+                    {
+                        text: 'What is the perimeter of a Pillar (3×7 cm)?',
+                        options: ['20 cm', '21 cm', '14 cm', '24 cm'],
+                        correct: 0,
+                        explanation: 'Perimeter = 2 × (3 + 7) = 20 cm.'
+                    }
+                ]
+            }
+        ];
+
+        // APP STATE
+        let currentDifficulty = 1;
+        let currentPuzzle = null;
+        let activePieces = []; // Array of piece objects
+        let selectedPieceId = null;
+        let hintsUsed = 0;
+        let currentQuestionIdx = 0;
+
+        // Color Palette for shapes
+        const SHAPE_COLORS = [
+            { bg: '#ef4444', text: '#ffffff', label: 'Red' },
+            { bg: '#3b82f6', text: '#ffffff', label: 'Blue' },
+            { bg: '#10b981', text: '#ffffff', label: 'Emerald' },
+            { bg: '#f59e0b', text: '#78350f', label: 'Amber' },
+            { bg: '#8b5cf6', text: '#ffffff', label: 'Purple' },
+            { bg: '#ec4899', text: '#ffffff', label: 'Pink' },
+            { bg: '#06b6d4', text: '#ffffff', label: 'Cyan' },
+            { bg: '#84cc16', text: '#1a2e05', label: 'Lime' },
+            { bg: '#f97316', text: '#ffffff', label: 'Orange' },
+            { bg: '#6366f1', text: '#ffffff', label: 'Indigo' }
+        ];
+
+        // Web Audio Synthesizer for lightweight sound effects
+        const AudioEngine = {
+            ctx: null,
+            init() {
+                if (!this.ctx) {
+                    this.ctx = new (window.AudioContext || window.webkitAudioContext)();
+                }
+            },
+            playSnap() {
+                try {
+                    this.init();
+                    const osc = this.ctx.createOscillator();
+                    const gain = this.ctx.createGain();
+                    osc.type = 'sine';
+                    osc.frequency.setValueAtTime(440, this.ctx.currentTime);
+                    osc.frequency.exponentialRampToValueAtTime(880, this.ctx.currentTime + 0.08);
+                    gain.gain.setValueAtTime(0.2, this.ctx.currentTime);
+                    gain.gain.linearRampToValueAtTime(0.01, this.ctx.currentTime + 0.08);
+                    osc.connect(gain);
+                    gain.connect(this.ctx.destination);
+                    osc.start();
+                    osc.stop(this.ctx.currentTime + 0.08);
+                } catch(e) {}
+            },
+            playRotate() {
+                try {
+                    this.init();
+                    const osc = this.ctx.createOscillator();
+                    const gain = this.ctx.createGain();
+                    osc.type = 'triangle';
+                    osc.frequency.setValueAtTime(320, this.ctx.currentTime);
+                    gain.gain.setValueAtTime(0.15, this.ctx.currentTime);
+                    gain.gain.linearRampToValueAtTime(0.01, this.ctx.currentTime + 0.05);
+                    osc.connect(gain);
+                    gain.connect(this.ctx.destination);
+                    osc.start();
+                    osc.stop(this.ctx.currentTime + 0.05);
+                } catch(e) {}
+            },
+            playVictory() {
+                try {
+                    this.init();
+                    const notes = [523.25, 659.25, 783.99, 1046.50]; // C5, E5, G5, C6
+                    notes.forEach((freq, idx) => {
+                        const osc = this.ctx.createOscillator();
+                        const gain = this.ctx.createGain();
+                        osc.type = 'sine';
+                        osc.frequency.setValueAtTime(freq, this.ctx.currentTime + idx * 0.1);
+                        gain.gain.setValueAtTime(0.2, this.ctx.currentTime + idx * 0.1);
+                        gain.gain.linearRampToValueAtTime(0.01, this.ctx.currentTime + idx * 0.1 + 0.25);
+                        osc.connect(gain);
+                        gain.connect(this.ctx.destination);
+                        osc.start(this.ctx.currentTime + idx * 0.1);
+                        osc.stop(this.ctx.currentTime + idx * 0.1 + 0.25);
+                    });
+                } catch(e) {}
+            }
+        };
+
+        window.onload = function() {
+            populatePuzzleDropdown();
+            setDifficulty(1);
+            setupKeyboardListeners();
+            setupCanvasClickToMove();
+        };
+
+        function populatePuzzleDropdown() {
+            const select = document.getElementById('puzzle-select');
+            select.innerHTML = '';
+            
+            const filtered = PUZZLES.filter(p => p.difficulty === currentDifficulty);
+            filtered.forEach(p => {
+                const opt = document.createElement('option');
+                opt.value = p.id;
+                opt.textContent = `${p.icon} ${p.name} (${p.slots.length} shapes)`;
+                select.appendChild(opt);
+            });
+        }
+
+        function setDifficulty(diff) {
+            currentDifficulty = diff;
+
+            // Highlight active difficulty button
+            [1, 2, 3].forEach(d => {
+                const btn = document.getElementById(`btn-diff-${d}`);
+                if (d === diff) {
+                    btn.className = 'px-3 py-1.5 rounded-lg transition-all bg-white text-brand-600 shadow-sm font-bold';
+                } else {
+                    btn.className = 'px-3 py-1.5 rounded-lg transition-all text-slate-600 hover:text-slate-900 font-medium';
+                }
+            });
+
+            populatePuzzleDropdown();
+            loadSelectedPuzzle();
+        }
+
+        function loadSelectedPuzzle() {
+            const select = document.getElementById('puzzle-select');
+            const pId = select.value || PUZZLES.find(p => p.difficulty === currentDifficulty).id;
+            
+            currentPuzzle = PUZZLES.find(p => p.id === pId);
+            hintsUsed = 0;
+            currentQuestionIdx = 0;
+            selectedPieceId = null;
+
+            // Update UI headers
+            document.getElementById('puzzle-title').textContent = `${currentPuzzle.icon} ${currentPuzzle.name}`;
+            const badge = document.getElementById('puzzle-category-badge');
+            badge.textContent = `${currentPuzzle.category} (${currentPuzzle.slots.length} Shapes)`;
+            
+            if (currentPuzzle.difficulty === 1) badge.className = 'text-[10px] font-extrabold uppercase tracking-widest bg-emerald-100 text-emerald-800 px-2 py-0.5 rounded-md';
+            else if (currentPuzzle.difficulty === 2) badge.className = 'text-[10px] font-extrabold uppercase tracking-widest bg-blue-100 text-blue-800 px-2 py-0.5 rounded-md';
+            else badge.className = 'text-[10px] font-extrabold uppercase tracking-widest bg-purple-100 text-purple-800 px-2 py-0.5 rounded-md';
+
+            // Generate piece objects corresponding to target slots
+            activePieces = currentPuzzle.slots.map((slot, idx) => {
+                const colorObj = SHAPE_COLORS[idx % SHAPE_COLORS.length];
+                return {
+                    id: `p_${slot.id}`,
+                    slotMatchId: slot.id,
+                    origW: slot.w,
+                    origH: slot.h,
+                    w: slot.w,
+                    h: slot.h,
+                    rotation: 0,
+                    x: null, // null means in tray
+                    y: null,
+                    isPlaced: false,
+                    color: colorObj,
+                    label: slot.label
+                };
+            });
+
+            // Shuffle active pieces in tray for tangram puzzle challenge
+            activePieces.sort(() => Math.random() - 0.5);
+
+            renderCanvas();
+            renderTray();
+            updateMetrics();
+            renderQuiz();
+        }
+
+        function renderCanvas() {
+            const wrapper = document.getElementById('canvas-wrapper');
+            const targetLayer = document.getElementById('target-layer');
+            const piecesLayer = document.getElementById('pieces-layer');
+
+            const widthPx = currentPuzzle.gridCols * GRID_CELL_SIZE;
+            const heightPx = currentPuzzle.gridRows * GRID_CELL_SIZE;
+
+            wrapper.style.width = `${widthPx}px`;
+            wrapper.style.height = `${heightPx}px`;
+
+            targetLayer.innerHTML = '';
+            piecesLayer.innerHTML = '';
+
+            // Map all occupied cells to calculate composite perimeter outline
+            const occupied = new Set();
+            currentPuzzle.slots.forEach(slot => {
+                for (let x = slot.x; x < slot.x + slot.w; x++) {
+                    for (let y = slot.y; y < slot.y + slot.h; y++) {
+                        occupied.add(`${x},${y}`);
+                    }
+                }
+            });
+
+            // SVG container for composite figure fill and solid perimeter line segments
+            const svgNS = "http://www.w3.org/2000/svg";
+            const svg = document.createElementNS(svgNS, "svg");
+            svg.setAttribute("width", widthPx);
+            svg.setAttribute("height", heightPx);
+            svg.setAttribute("class", "absolute inset-0 pointer-events-none");
+
+            // 1. Composite Figure Solid Fill
+            currentPuzzle.slots.forEach(slot => {
+                const rect = document.createElementNS(svgNS, "rect");
+                rect.setAttribute("x", slot.x * GRID_CELL_SIZE);
+                rect.setAttribute("y", slot.y * GRID_CELL_SIZE);
+                rect.setAttribute("width", slot.w * GRID_CELL_SIZE);
+                rect.setAttribute("height", slot.h * GRID_CELL_SIZE);
+                rect.setAttribute("fill", "#cbd5e1");
+                rect.setAttribute("fill-opacity", "0.55");
+                svg.appendChild(rect);
+            });
+
+            // 2. Solid Perimeter Boundary Line Segments
+            const pathGroup = document.createElementNS(svgNS, "g");
+            pathGroup.setAttribute("stroke", "#334155");
+            pathGroup.setAttribute("stroke-width", "3");
+            pathGroup.setAttribute("stroke-linecap", "round");
+            pathGroup.setAttribute("stroke-linejoin", "round");
+
+            occupied.forEach(key => {
+                const [x, y] = key.split(',').map(Number);
+                const px = x * GRID_CELL_SIZE;
+                const py = y * GRID_CELL_SIZE;
+
+                if (!occupied.has(`${x},${y - 1}`)) {
+                    const line = document.createElementNS(svgNS, "line");
+                    line.setAttribute("x1", px); line.setAttribute("y1", py);
+                    line.setAttribute("x2", px + GRID_CELL_SIZE); line.setAttribute("y2", py);
+                    pathGroup.appendChild(line);
+                }
+                if (!occupied.has(`${x},${y + 1}`)) {
+                    const line = document.createElementNS(svgNS, "line");
+                    line.setAttribute("x1", px); line.setAttribute("y1", py + GRID_CELL_SIZE);
+                    line.setAttribute("x2", px + GRID_CELL_SIZE); line.setAttribute("y2", py + GRID_CELL_SIZE);
+                    pathGroup.appendChild(line);
+                }
+                if (!occupied.has(`${x - 1},${y}`)) {
+                    const line = document.createElementNS(svgNS, "line");
+                    line.setAttribute("x1", px); line.setAttribute("y1", py);
+                    line.setAttribute("x2", px); line.setAttribute("y2", py + GRID_CELL_SIZE);
+                    pathGroup.appendChild(line);
+                }
+                if (!occupied.has(`${x + 1},${y}`)) {
+                    const line = document.createElementNS(svgNS, "line");
+                    line.setAttribute("x1", px + GRID_CELL_SIZE); line.setAttribute("y1", py);
+                    line.setAttribute("x2", px + GRID_CELL_SIZE); line.setAttribute("y2", py + GRID_CELL_SIZE);
+                    pathGroup.appendChild(line);
+                }
+            });
+
+            svg.appendChild(pathGroup);
+            targetLayer.appendChild(svg);
+
+            // Target Slot overlays for hint animations
+            currentPuzzle.slots.forEach(slot => {
+                const el = document.createElement('div');
+                el.id = `target_${slot.id}`;
+                el.className = 'target-slot absolute pointer-events-none';
+                el.style.left = `${slot.x * GRID_CELL_SIZE}px`;
+                el.style.top = `${slot.y * GRID_CELL_SIZE}px`;
+                el.style.width = `${slot.w * GRID_CELL_SIZE}px`;
+                el.style.height = `${slot.h * GRID_CELL_SIZE}px`;
+                
+                targetLayer.appendChild(el);
+            });
+
+            // Render Placed Pieces on Grid
+            activePieces.filter(p => p.isPlaced).forEach(piece => {
+                const el = createPieceElement(piece, true);
+                piecesLayer.appendChild(el);
+            });
+        }
+
+        function createPieceElement(piece, isOnCanvas = false) {
+            const el = document.createElement('div');
+            el.id = piece.id;
+
+            el.className = `piece-element absolute rounded-md flex flex-col items-center justify-center shadow-md font-bold text-white transition-all ${selectedPieceId === piece.id ? 'piece-selected' : ''}`;
+            el.style.backgroundColor = piece.color.bg;
+
+            if (isOnCanvas) {
+                el.style.left = `${piece.x * GRID_CELL_SIZE}px`;
+                el.style.top = `${piece.y * GRID_CELL_SIZE}px`;
+                el.style.width = `${piece.w * GRID_CELL_SIZE}px`;
+                el.style.height = `${piece.h * GRID_CELL_SIZE}px`;
+            } else {
+                const scale = 0.95;
+                el.style.position = 'relative';
+                el.style.width = `${piece.w * GRID_CELL_SIZE * scale}px`;
+                el.style.height = `${piece.h * GRID_CELL_SIZE * scale}px`;
+            }
+
+            // Attach Unified Drag & Selection Pointer Events
+            attachPointerEvents(el, piece);
+
+            // Selection Click Handler
+            el.onclick = (e) => {
+                e.stopPropagation();
+                selectPiece(piece.id);
+            };
+
+            // Double click to return placed piece to shape tray
+            el.ondblclick = (e) => {
+                e.stopPropagation();
+                if (piece.isPlaced) {
+                    returnPieceToTray(piece.id);
+                }
+            };
+
+            return el;
+        }
+
+        function renderTray() {
+            const tray = document.getElementById('piece-tray');
+            tray.innerHTML = '';
+
+            const unplaced = activePieces.filter(p => !p.isPlaced);
+            document.getElementById('tray-count').textContent = `${unplaced.length} / ${activePieces.length} Remaining`;
+
+            if (unplaced.length === 0) {
+                tray.innerHTML = `
+                    <div class="w-full py-8 text-center text-xs text-emerald-600 font-bold bg-emerald-50 rounded-xl border border-emerald-200">
+                        ✨ All pieces placed on the grid!
+                    </div>
+                `;
+                return;
+            }
+
+            unplaced.forEach(piece => {
+                const card = document.createElement('div');
+                card.className = 'bg-slate-50 border border-slate-200 p-3 rounded-xl flex flex-col items-center justify-center hover:border-brand-400 hover:shadow-md transition-all w-auto cursor-pointer shadow-sm min-w-[70px] min-h-[70px]';
+                card.onclick = (e) => {
+                    e.stopPropagation();
+                    selectPiece(piece.id);
+                };
+                
+                const elem = createPieceElement(piece, false);
+                card.appendChild(elem);
+
+                tray.appendChild(card);
+            });
+        }
+
+        function setupCanvasClickToMove() {
+            const wrapper = document.getElementById('canvas-wrapper');
+            const dropPreview = document.getElementById('drop-preview');
+            const tray = document.getElementById('piece-tray');
+
+            wrapper.addEventListener('pointermove', (e) => {
+                if (!selectedPieceId) {
+                    dropPreview.classList.add('hidden');
+                    return;
+                }
+
+                const piece = activePieces.find(p => p.id === selectedPieceId);
+                if (!piece) return;
+
+                const rect = wrapper.getBoundingClientRect();
+                const relativeX = e.clientX - rect.left;
+                const relativeY = e.clientY - rect.top;
+
+                let gridX = Math.floor((relativeX / GRID_CELL_SIZE) - (piece.w / 2));
+                let gridY = Math.floor((relativeY / GRID_CELL_SIZE) - (piece.h / 2));
+
+                gridX = Math.max(0, Math.min(currentPuzzle.gridCols - piece.w, gridX));
+                gridY = Math.max(0, Math.min(currentPuzzle.gridRows - piece.h, gridY));
+
+                dropPreview.style.left = `${gridX * GRID_CELL_SIZE}px`;
+                dropPreview.style.top = `${gridY * GRID_CELL_SIZE}px`;
+                dropPreview.style.width = `${piece.w * GRID_CELL_SIZE}px`;
+                dropPreview.style.height = `${piece.h * GRID_CELL_SIZE}px`;
+                dropPreview.classList.remove('hidden');
+            });
+
+            wrapper.addEventListener('pointerleave', () => {
+                dropPreview.classList.add('hidden');
+            });
+
+            wrapper.addEventListener('click', (e) => {
+                if (!selectedPieceId) return;
+
+                if (e.target.closest('.piece-element')) return;
+
+                const piece = activePieces.find(p => p.id === selectedPieceId);
+                if (!piece) return;
+
+                const rect = wrapper.getBoundingClientRect();
+                const relativeX = e.clientX - rect.left;
+                const relativeY = e.clientY - rect.top;
+
+                const rawGridX = relativeX / GRID_CELL_SIZE - piece.w / 2;
+                const rawGridY = relativeY / GRID_CELL_SIZE - piece.h / 2;
+
+                let gridX = Math.round(rawGridX);
+                let gridY = Math.round(rawGridY);
+
+                // Smart snap to any unoccupied matching target slot
+                const matchedSlot = currentPuzzle.slots.find(s => {
+                    const isDimMatch = (s.w === piece.w && s.h === piece.h) || (s.w === piece.h && s.h === piece.w);
+                    const isNear = Math.abs(s.x - rawGridX) < 1.0 && Math.abs(s.y - rawGridY) < 1.0;
+                    const isOccupied = activePieces.some(p => p.id !== piece.id && p.isPlaced && p.x === s.x && p.y === s.y);
+                    return isDimMatch && isNear && !isOccupied;
+                });
+
+                if (matchedSlot) {
+                    gridX = matchedSlot.x;
+                    gridY = matchedSlot.y;
+                    if (piece.w !== matchedSlot.w || piece.h !== matchedSlot.h) {
+                        const tempW = piece.w;
+                        piece.w = piece.h;
+                        piece.h = tempW;
+                        piece.rotation = (piece.rotation + 90) % 360;
+                    }
+                } else {
+                    gridX = Math.max(0, Math.min(currentPuzzle.gridCols - piece.w, gridX));
+                    gridY = Math.max(0, Math.min(currentPuzzle.gridRows - piece.h, gridY));
+                }
+
+                piece.x = gridX;
+                piece.y = gridY;
+                piece.isPlaced = true;
+
+                AudioEngine.playSnap();
+                dropPreview.classList.add('hidden');
+
+                renderCanvas();
+                renderTray();
+                updateMetrics();
+            });
+
+            tray.addEventListener('click', (e) => {
+                if (e.target === tray && selectedPieceId) {
+                    returnPieceToTray(selectedPieceId);
+                }
+            });
+        }
+
+        function attachPointerEvents(el, piece) {
+            let isPointerDown = false;
+            let isDragging = false;
+            let dragAvatar = null;
+            let startX = 0;
+            let startY = 0;
+            let offsetX = 0;
+            let offsetY = 0;
+
+            el.onpointerdown = (e) => {
+                e.preventDefault();
+                selectPiece(piece.id);
+
+                isPointerDown = true;
+                isDragging = false;
+
+                const rect = el.getBoundingClientRect();
+                startX = e.clientX;
+                startY = e.clientY;
+                offsetX = e.clientX - rect.left;
+                offsetY = e.clientY - rect.top;
+
+                try {
+                    el.setPointerCapture(e.pointerId);
+                } catch(err) {}
+            };
+
+            el.onpointermove = (e) => {
+                if (!isPointerDown) return;
+                e.preventDefault();
+
+                const dist = Math.hypot(e.clientX - startX, e.clientY - startY);
+
+                if (!isDragging && dist > 6) {
+                    isDragging = true;
+                    dragAvatar = document.createElement('div');
+                    dragAvatar.className = 'fixed pointer-events-none rounded-md shadow-2xl z-[9999] transition-transform font-bold text-white flex items-center justify-center';
+                    dragAvatar.style.backgroundColor = piece.color.bg;
+                    dragAvatar.style.width = `${piece.w * GRID_CELL_SIZE}px`;
+                    dragAvatar.style.height = `${piece.h * GRID_CELL_SIZE}px`;
+                    dragAvatar.style.transform = 'scale(1.05)';
+                    dragAvatar.style.opacity = '0.9';
+
+                    document.body.appendChild(dragAvatar);
+                    el.style.opacity = '0.3';
+                }
+
+                if (!isDragging || !dragAvatar) return;
+
+                const avatarX = e.clientX - offsetX;
+                const avatarY = e.clientY - offsetY;
+                dragAvatar.style.left = `${avatarX}px`;
+                dragAvatar.style.top = `${avatarY}px`;
+
+                const wrapper = document.getElementById('canvas-wrapper');
+                const dropPreview = document.getElementById('drop-preview');
+                const canvasRect = wrapper.getBoundingClientRect();
+
+                if (e.clientX >= canvasRect.left && e.clientX <= canvasRect.right &&
+                    e.clientY >= canvasRect.top && e.clientY <= canvasRect.bottom) {
+
+                    const relativeX = e.clientX - canvasRect.left - offsetX;
+                    const relativeY = e.clientY - canvasRect.top - offsetY;
+
+                    let gridX = Math.round(relativeX / GRID_CELL_SIZE);
+                    let gridY = Math.round(relativeY / GRID_CELL_SIZE);
+
+                    gridX = Math.max(0, Math.min(currentPuzzle.gridCols - piece.w, gridX));
+                    gridY = Math.max(0, Math.min(currentPuzzle.gridRows - piece.h, gridY));
+
+                    dropPreview.style.left = `${gridX * GRID_CELL_SIZE}px`;
+                    dropPreview.style.top = `${gridY * GRID_CELL_SIZE}px`;
+                    dropPreview.style.width = `${piece.w * GRID_CELL_SIZE}px`;
+                    dropPreview.style.height = `${piece.h * GRID_CELL_SIZE}px`;
+                    dropPreview.classList.remove('hidden');
+                } else {
+                    dropPreview.classList.add('hidden');
+                }
+            };
+
+            el.onpointerup = (e) => {
+                if (!isPointerDown) return;
+                isPointerDown = false;
+
+                try {
+                    el.releasePointerCapture(e.pointerId);
+                } catch(err) {}
+
+                if (dragAvatar) {
+                    dragAvatar.remove();
+                    dragAvatar = null;
+                }
+                el.style.opacity = '1';
+
+                const wrapper = document.getElementById('canvas-wrapper');
+                const dropPreview = document.getElementById('drop-preview');
+                dropPreview.classList.add('hidden');
+
+                if (isDragging) {
+                    isDragging = false;
+                    const canvasRect = wrapper.getBoundingClientRect();
+
+                    if (e.clientX >= canvasRect.left - 20 && e.clientX <= canvasRect.right + 20 &&
+                        e.clientY >= canvasRect.top - 20 && e.clientY <= canvasRect.bottom + 20) {
+
+                        const relativeX = e.clientX - canvasRect.left - offsetX;
+                        const relativeY = e.clientY - canvasRect.top - offsetY;
+
+                        const rawGridX = relativeX / GRID_CELL_SIZE;
+                        const rawGridY = relativeY / GRID_CELL_SIZE;
+
+                        let targetGridX = Math.round(rawGridX);
+                        let targetGridY = Math.round(rawGridY);
+
+                        // Match any unoccupied target slot of identical dimensions (allowing 90 deg rotation fit)
+                        const matchedSlot = currentPuzzle.slots.find(s => {
+                            const isDimMatch = (s.w === piece.w && s.h === piece.h) || (s.w === piece.h && s.h === piece.w);
+                            const isNear = Math.abs(s.x - rawGridX) < 0.8 && Math.abs(s.y - rawGridY) < 0.8;
+                            const isOccupied = activePieces.some(p => p.id !== piece.id && p.isPlaced && p.x === s.x && p.y === s.y);
+                            return isDimMatch && isNear && !isOccupied;
+                        });
+
+                        if (matchedSlot) {
+                            targetGridX = matchedSlot.x;
+                            targetGridY = matchedSlot.y;
+                            if (piece.w !== matchedSlot.w || piece.h !== matchedSlot.h) {
+                                const tempW = piece.w;
+                                piece.w = piece.h;
+                                piece.h = tempW;
+                                piece.rotation = (piece.rotation + 90) % 360;
+                            }
+                            AudioEngine.playSnap();
+                        } else {
+                            targetGridX = Math.max(0, Math.min(currentPuzzle.gridCols - piece.w, targetGridX));
+                            targetGridY = Math.max(0, Math.min(currentPuzzle.gridRows - piece.h, targetGridY));
+                        }
+
+                        piece.x = targetGridX;
+                        piece.y = targetGridY;
+                        piece.isPlaced = true;
+                    } else {
+                        piece.x = null;
+                        piece.y = null;
+                        piece.isPlaced = false;
+                    }
+
+                    renderCanvas();
+                    renderTray();
+                    updateMetrics();
+                }
+
+                selectPiece(piece.id);
+            };
+
+            el.onpointercancel = () => {
+                isPointerDown = false;
+                isDragging = false;
+                if (dragAvatar) {
+                    dragAvatar.remove();
+                    dragAvatar = null;
+                }
+                el.style.opacity = '1';
+                document.getElementById('drop-preview').classList.add('hidden');
+            };
+        }
+
+        function selectPiece(pieceId) {
+            selectedPieceId = pieceId;
+            
+            const rotateBtn = document.getElementById('btn-rotate-sel');
+            const piece = activePieces.find(p => p.id === pieceId);
+            
+            if (piece) {
+                if (rotateBtn) rotateBtn.disabled = false;
+                renderInspector(piece);
+            } else {
+                if (rotateBtn) rotateBtn.disabled = true;
+                clearInspector();
+            }
+
+            renderCanvas();
+            renderTray();
+        }
+
+        function returnPieceToTray(pieceId) {
+            const piece = activePieces.find(p => p.id === pieceId);
+            if (!piece) return;
+            piece.x = null;
+            piece.y = null;
+            piece.isPlaced = false;
+            if (selectedPieceId === pieceId) {
+                selectedPieceId = null;
+            }
+            renderCanvas();
+            renderTray();
+            updateMetrics();
+            clearInspector();
+        }
+
+        function moveSelectedPiece(dx, dy) {
+            if (!selectedPieceId) return;
+            const piece = activePieces.find(p => p.id === selectedPieceId);
+            if (!piece) return;
+
+            // If shape is selected from tray and not yet on grid, place it near center first
+            if (!piece.isPlaced) {
+                piece.x = Math.max(0, Math.floor((currentPuzzle.gridCols - piece.w) / 2));
+                piece.y = Math.max(0, Math.floor((currentPuzzle.gridRows - piece.h) / 2));
+                piece.isPlaced = true;
+                AudioEngine.playSnap();
+                renderCanvas();
+                renderTray();
+                updateMetrics();
+                renderInspector(piece);
+                return;
+            }
+
+            const newX = piece.x + dx;
+            const newY = piece.y + dy;
+
+            if (newX >= 0 && newX + piece.w <= currentPuzzle.gridCols) {
+                piece.x = newX;
+            }
+            if (newY >= 0 && newY + piece.h <= currentPuzzle.gridRows) {
+                piece.y = newY;
+            }
+
+            AudioEngine.playSnap();
+            renderCanvas();
+            updateMetrics();
+            renderInspector(piece);
+        }
+
+        function rotateSelectedPiece() {
+            if (!selectedPieceId) return;
+            const piece = activePieces.find(p => p.id === selectedPieceId);
+            if (!piece) return;
+
+            // Swap width and height for 90-degree rotation
+            const tempW = piece.w;
+            piece.w = piece.h;
+            piece.h = tempW;
+            piece.rotation = (piece.rotation + 90) % 360;
+
+            if (piece.isPlaced) {
+                piece.x = Math.max(0, Math.min(currentPuzzle.gridCols - piece.w, piece.x));
+                piece.y = Math.max(0, Math.min(currentPuzzle.gridRows - piece.h, piece.y));
+            }
+
+            AudioEngine.playRotate();
+            renderCanvas();
+            renderTray();
+            updateMetrics();
+            renderInspector(piece);
+        }
+
+        function resetPuzzle() {
+            activePieces.forEach(p => {
+                p.x = null;
+                p.y = null;
+                p.isPlaced = false;
+                p.rotation = 0;
+                p.w = p.origW;
+                p.h = p.origH;
+            });
+            selectedPieceId = null;
+            hintsUsed = 0;
+            renderCanvas();
+            renderTray();
+            updateMetrics();
+            clearInspector();
+        }
+
+        function giveHint() {
+            // Find a slot that is not currently covered by a piece of matching size
+            const unfilledSlot = currentPuzzle.slots.find(slot => {
+                return !activePieces.some(p => p.isPlaced && p.x === slot.x && p.y === slot.y && p.w === slot.w && p.h === slot.h);
+            });
+
+            if (!unfilledSlot) return;
+
+            // Find an unplaced or misplaced piece that can fit into unfilledSlot (considering orientation/rotation)
+            let candidatePiece = activePieces.find(p => !p.isPlaced && (
+                (p.w === unfilledSlot.w && p.h === unfilledSlot.h) || 
+                (p.w === unfilledSlot.h && p.h === unfilledSlot.w)
+            ));
+
+            if (!candidatePiece) {
+                candidatePiece = activePieces.find(p => p.isPlaced && 
+                    !currentPuzzle.slots.some(s => s.x === p.x && s.y === p.y && s.w === p.w && s.h === p.h) &&
+                    ((p.w === unfilledSlot.w && p.h === unfilledSlot.h) || (p.w === unfilledSlot.h && p.h === unfilledSlot.w))
+                );
+            }
+
+            if (!candidatePiece) return;
+
+            // Rotate piece if necessary to match slot orientation
+            if (candidatePiece.w !== unfilledSlot.w || candidatePiece.h !== unfilledSlot.h) {
+                const tempW = candidatePiece.w;
+                candidatePiece.w = candidatePiece.h;
+                candidatePiece.h = tempW;
+                candidatePiece.rotation = (candidatePiece.rotation + 90) % 360;
+            }
+
+            candidatePiece.x = unfilledSlot.x;
+            candidatePiece.y = unfilledSlot.y;
+            candidatePiece.isPlaced = true;
+            hintsUsed++;
+
+            AudioEngine.playSnap();
+            selectPiece(candidatePiece.id);
+
+            const targetEl = document.getElementById(`target_${unfilledSlot.id}`);
+            if (targetEl) {
+                targetEl.classList.add('hint-active');
+                setTimeout(() => targetEl.classList.remove('hint-active'), 1200);
+            }
+
+            renderCanvas();
+            renderTray();
+            updateMetrics();
+        }
+
+        function checkPuzzleSolution() {
+            const allPlaced = activePieces.every(p => p.isPlaced);
+            if (!allPlaced) {
+                showToast('Place all shapes onto the grid to complete the puzzle!');
+                return;
+            }
+
+            const slots = currentPuzzle.slots;
+            const pieces = activePieces.filter(p => p.isPlaced);
+
+            // Bipartite Matching: Build adjacency matrix where piece matches slot by position & dimensions
+            const adj = slots.map(slot => {
+                return pieces.map((p, pIdx) => {
+                    const isMatch = (p.x === slot.x && p.y === slot.y && p.w === slot.w && p.h === slot.h);
+                    return isMatch ? pIdx : -1;
+                }).filter(idx => idx !== -1);
+            });
+
+            // Augmenting path search for Maximum Bipartite Matching
+            const matchP = new Array(pieces.length).fill(-1);
+
+            function dfs(sIdx, visited) {
+                for (let pIdx of adj[sIdx]) {
+                    if (visited[pIdx]) continue;
+                    visited[pIdx] = true;
+                    if (matchP[pIdx] < 0 || dfs(matchP[pIdx], visited)) {
+                        matchP[pIdx] = sIdx;
+                        return true;
+                    }
+                }
+                return false;
+            }
+
+            let matchCount = 0;
+            for (let i = 0; i < slots.length; i++) {
+                const visited = new Array(pieces.length).fill(false);
+                if (dfs(i, visited)) {
+                    matchCount++;
+                }
+            }
+
+            const isCorrect = (matchCount === slots.length);
+
+            if (isCorrect) {
+                AudioEngine.playVictory();
+                showCelebrationModal();
+            } else {
+                showToast('Some pieces are not in the right spot yet. Check alignment!');
+            }
+        }
+
+        function showToast(message) {
+            let toast = document.getElementById('toast-msg');
+            if (!toast) {
+                toast = document.createElement('div');
+                toast.id = 'toast-msg';
+                toast.className = 'fixed top-16 left-1/2 -translate-x-1/2 bg-slate-900 text-white text-xs font-bold px-4 py-2 rounded-xl shadow-xl z-50 transition-opacity duration-300 opacity-0 pointer-events-none';
+                document.body.appendChild(toast);
+            }
+            toast.textContent = message;
+            toast.classList.remove('opacity-0');
+            setTimeout(() => toast.classList.add('opacity-0'), 2500);
+        }
+
+        function showCelebrationModal() {
+            const modal = document.getElementById('celebration-modal');
+            if (!modal) return;
+
+            const stars = hintsUsed === 0 ? '⭐⭐⭐' : (hintsUsed <= 2 ? '⭐⭐' : '⭐');
+            const totalArea = currentPuzzle.slots.reduce((acc, s) => acc + (s.w * s.h), 0);
+
+            document.getElementById('stars-earned').textContent = stars;
+            document.getElementById('final-total-area').textContent = `${totalArea} cm²`;
+            document.getElementById('final-hints-count').textContent = hintsUsed;
+
+            modal.classList.remove('hidden');
+        }
+
+        function closeCelebrationModal() {
+            const modal = document.getElementById('celebration-modal');
+            if (modal) modal.classList.add('hidden');
+        }
+
+        function loadNextPuzzle() {
+            closeCelebrationModal();
+            const select = document.getElementById('puzzle-select');
+            if (select.selectedIndex < select.options.length - 1) {
+                select.selectedIndex += 1;
+            } else {
+                select.selectedIndex = 0;
+            }
+            loadSelectedPuzzle();
+        }
+
+        function toggleTeacherGuide(show) {
+            const modal = document.getElementById('teacher-modal');
+            if (!modal) return;
+            if (show) modal.classList.remove('hidden');
+            else modal.classList.add('hidden');
+        }
+
+        function renderInspector(piece) {}
+        function clearInspector() {}
+        function updateMetrics() {}
+        function renderQuiz() {}
+
+        function setupKeyboardListeners() {
+            window.addEventListener('keydown', (e) => {
+                if (e.key === 'r' || e.key === 'R') {
+                    rotateSelectedPiece();
+                } else if (e.key === 'ArrowUp') {
+                    e.preventDefault();
+                    moveSelectedPiece(0, -1);
+                } else if (e.key === 'ArrowDown') {
+                    e.preventDefault();
+                    moveSelectedPiece(0, 1);
+                } else if (e.key === 'ArrowLeft') {
+                    e.preventDefault();
+                    moveSelectedPiece(-1, 0);
+                } else if (e.key === 'ArrowRight') {
+                    e.preventDefault();
+                    moveSelectedPiece(1, 0);
+                } else if (e.key === 'Escape') {
+                    selectedPieceId = null;
+                    renderCanvas();
+                    clearInspector();
+                }
+            });
+        }
+    </script>
+</body>
+</html>
